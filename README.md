@@ -2,6 +2,7 @@
 
 ## Initial requirements:
 * Slack account on
+  <img width="256" height="256" alt="image" src="https://github.com/user-attachments/assets/5569d5f2-94fd-48eb-bfd9-653c4a92ef84" />
 * GitHub account
 * Gmail account
 * Medium.org account
