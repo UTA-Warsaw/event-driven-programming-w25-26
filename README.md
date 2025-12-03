@@ -7,11 +7,12 @@
 * Gmail account
 * Medium.org account
 * n8n.io account
+* Account on https://student-hub.base44.app
 
 ## Course requirements
 * min. 80% attendance
 * pass each exam (group and 1-1)
-* personal website with Lovable
+* personal website with Lovable/Base44
 * n8n workflow
 * EDP project on GitHub
 * article about Event Driven Programming on medium.org
