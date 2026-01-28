@@ -1,1 +1,247 @@
+import pygame
+import random
+import os
+
+# ================= WINDOW =================
+WIDTH, HEIGHT = 900, 600
+FPS = 60
+
+# ================= GAME SETTINGS =================
+GRAVITY = 0.6
+JUMP_POWER = -18
+PLAYER_SPEED = 5
+
+PLATFORM_WIDTH = 120
+PLATFORM_HEIGHT = 20
+RED_PLATFORM_WIDTH = 160
+
+# ================= INIT =================
+pygame.init()
+pygame.mixer.init()
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Tower Climb")
+clock = pygame.time.Clock()
+
+font = pygame.font.SysFont("arial", 24)
+big_font = pygame.font.SysFont("arial", 46)
+
+# ================= PATHS =================
+BASE = os.path.dirname(os.path.abspath(__file__))
+ASSETS = os.path.join(BASE, "assets")
+SCORE_FILE = os.path.join(BASE, "scores.txt")
+
+if not os.path.exists(SCORE_FILE):
+    open(SCORE_FILE, "w").close()
+
+# ================= LOAD ASSETS =================
+BACKGROUND = pygame.image.load(os.path.join(ASSETS, "background.png")).convert()
+BACKGROUND = pygame.transform.scale(BACKGROUND, (WIDTH, HEIGHT))
+
+PLAYER_IMG = pygame.image.load(os.path.join(ASSETS, "player.png")).convert_alpha()
+PLAYER_IMG = pygame.transform.scale(PLAYER_IMG, (40, 55))
+
+PLATFORM_GREEN = pygame.image.load(os.path.join(ASSETS, "platform_green.png")).convert_alpha()
+PLATFORM_RED = pygame.image.load(os.path.join(ASSETS, "platform_red.png")).convert_alpha()
+
+# ================= MUSIC =================
+pygame.mixer.music.load(os.path.join(ASSETS, "retro-143303.mp3"))
+pygame.mixer.music.set_volume(0.25)
+pygame.mixer.music.play(-1)
+music_on = True
+
+# ================= CLASSES =================
+class Player:
+    def __init__(self):
+        self.rect = pygame.Rect(WIDTH//2, HEIGHT-120, 40, 55)
+        self.vel_y = 0
+        self.on_ground = False
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_a]:
+            self.rect.x -= PLAYER_SPEED
+        if keys[pygame.K_d]:
+            self.rect.x += PLAYER_SPEED
+
+        if keys[pygame.K_SPACE] and self.on_ground:
+            self.vel_y = JUMP_POWER
+            self.on_ground = False
+
+        self.vel_y += GRAVITY
+        self.rect.y += self.vel_y
+        self.rect.x = max(0, min(WIDTH - self.rect.width, self.rect.x))
+
+class Platform:
+    def __init__(self, x, y, moving=False):
+        self.moving = moving
+        self.width = RED_PLATFORM_WIDTH if moving else PLATFORM_WIDTH
+        img = PLATFORM_RED if moving else PLATFORM_GREEN
+        self.image = pygame.transform.scale(img, (self.width, PLATFORM_HEIGHT))
+        self.rect = pygame.Rect(x, y, self.width, PLATFORM_HEIGHT)
+        self.speed = random.choice([-2, 2]) if moving else 0
+
+    def update(self):
+        if self.moving:
+            self.rect.x += self.speed
+            if self.rect.left <= 0 or self.rect.right >= WIDTH:
+                self.speed *= -1
+
+# ================= SCORE =================
+def load_scores():
+    with open(SCORE_FILE, "r") as f:
+        return [int(s) for s in f if s.strip().isdigit()]
+
+def save_score(score):
+    scores = load_scores()
+    scores.append(score)
+    scores = sorted(scores, reverse=True)[:5]
+    with open(SCORE_FILE, "w") as f:
+        for s in scores:
+            f.write(str(s) + "\n")
+
+# ================= BUTTONS =================
+start_btn = pygame.Rect(350, 260, 200, 50)
+music_btn = pygame.Rect(350, 330, 200, 50)
+quit_btn  = pygame.Rect(350, 400, 200, 50)
+
+def draw_button(rect, text):
+    mouse = pygame.mouse.get_pos()
+    color = (120,180,255) if rect.collidepoint(mouse) else (70,130,220)
+    pygame.draw.rect(screen, color, rect, border_radius=10)
+    txt = font.render(text, True, (255,255,255))
+    screen.blit(txt, (rect.centerx - txt.get_width()//2,
+                      rect.centery - txt.get_height()//2))
+
+# ================= RESET =================
+def reset_game():
+    global player, platforms, camera_offset, score
+    player = Player()
+    platforms = [Platform(WIDTH//2 - PLATFORM_WIDTH//2, HEIGHT - 40, False)]
+    for i in range(1, 8):
+        platforms.append(
+            Platform(
+                random.randint(100, WIDTH - 300),
+                HEIGHT - i * 90,
+                random.choice([True, False])
+            )
+        )
+    camera_offset = 0
+    score = 0
+
+reset_game()
+game_state = "menu"
+
+# ================= MAIN LOOP =================
+running = True
+while running:
+    clock.tick(FPS)
+    screen.blit(BACKGROUND, (0, 0))
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                running = False
+
+            if event.key == pygame.K_m:
+                if music_on:
+                    pygame.mixer.music.pause()
+                    music_on = False
+                else:
+                    pygame.mixer.music.unpause()
+                    music_on = True
+
+            if game_state == "gameover" and event.key == pygame.K_r:
+                reset_game()
+                game_state = "playing"
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if game_state == "menu":
+                if start_btn.collidepoint(event.pos):
+                    reset_game()
+                    game_state = "playing"
+                if music_btn.collidepoint(event.pos):
+                    if music_on:
+                        pygame.mixer.music.pause()
+                        music_on = False
+                    else:
+                        pygame.mixer.music.unpause()
+                        music_on = True
+                if quit_btn.collidepoint(event.pos):
+                    running = False
+
+    # ===== MENU =====
+    if game_state == "menu":
+        title = big_font.render("TOWER CLIMB", True, (255,255,255))
+        screen.blit(title, (WIDTH//2 - title.get_width()//2, 170))
+        draw_button(start_btn, "Start")
+        draw_button(music_btn, "Music On / Off")
+        draw_button(quit_btn, "Quit")
+
+    # ===== PLAYING =====
+    elif game_state == "playing":
+        player.update()
+        player.on_ground = False
+
+        for p in platforms:
+            p.update()
+            if player.rect.colliderect(p.rect):
+                if player.vel_y >= 0 and player.rect.bottom <= p.rect.top + 15:
+                    player.rect.bottom = p.rect.top
+                    player.vel_y = 0
+                    player.on_ground = True
+                    if p.moving:
+                        player.rect.x += p.speed
+
+        # CAMERA
+        if player.rect.y < HEIGHT // 3:
+            diff = HEIGHT // 3 - player.rect.y
+            player.rect.y = HEIGHT // 3
+            camera_offset += diff
+            for p in platforms:
+                p.rect.y += diff
+
+        score = camera_offset // 10
+
+        while len(platforms) < 12:
+            platforms.append(
+                Platform(
+                    random.randint(100, WIDTH - 300),
+                    random.randint(-120, -40),
+                    random.choice([True, False])
+                )
+            )
+
+        platforms = [p for p in platforms if p.rect.y < HEIGHT]
+
+        if player.rect.top > HEIGHT:
+            save_score(score)
+            game_state = "gameover"
+
+        screen.blit(PLAYER_IMG, player.rect)
+        for p in platforms:
+            screen.blit(p.image, p.rect)
+
+        screen.blit(font.render(f"Score: {score}", True, (255,255,255)), (10,10))
+
+    # ===== GAME OVER =====
+    else:
+        over = big_font.render("GAME OVER", True, (255,80,80))
+        screen.blit(over, (WIDTH//2 - 120, 150))
+
+        y = 230
+        for i, s in enumerate(load_scores()):
+            screen.blit(font.render(f"{i+1}. {s}", True, (255,255,255)),
+                        (WIDTH//2 - 40, y))
+            y += 25
+
+        info = font.render("R - Restart | ESC - Quit", True, (200,200,200))
+        screen.blit(info, (WIDTH//2 - 140, y + 20))
+
+    pygame.display.update()
+
+pygame.quit()
 
