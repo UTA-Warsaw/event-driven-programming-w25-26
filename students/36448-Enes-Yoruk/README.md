@@ -1,5 +1,3 @@
-Source Link: https://emergency-alerts-17.preview.emergentagent.com
-
 Emergency Alert System
 
 How it works:
